@@ -9,6 +9,7 @@ import ParkingPage from "./pages/ParkingPage";
 import ReservationsPage from "./pages/ReservationsPage";
 import VehiclesPage from "./pages/VehiclesPage";
 import ProfilePage from "./pages/ProfilePage";
+import NotificationsPage from "./pages/NotificationsPage";
 import StyleguidePage from "./pages/StyleguidePage";
 import NotFoundPage from "./pages/NotFoundPage";
 
@@ -75,6 +76,16 @@ export default function App() {
           <ProtectedRoute>
             <Layout>
               <ProfilePage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/notifications"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <NotificationsPage />
             </Layout>
           </ProtectedRoute>
         }

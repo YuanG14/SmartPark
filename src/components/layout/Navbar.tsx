@@ -3,6 +3,7 @@ import { Bell, LogOut, Search, Settings } from "lucide-react";
 import { Avatar } from "../ui/Avatar";
 import { Tooltip } from "../ui/Tooltip";
 import { useAuth } from "../../features/auth/AuthProvider";
+import { useNotifications } from "../../hooks/useNotifications";
 
 const links = [
   { to: "/dashboard", label: "Dashboard" },
@@ -15,6 +16,7 @@ const roleLabel = { user: "Parking user", staff: "Parking staff", admin: "Admin"
 
 export function Navbar() {
   const { profile, signOut } = useAuth();
+  const { unreadCount } = useNotifications();
   const navigate = useNavigate();
 
   async function handleSignOut() {
@@ -57,12 +59,19 @@ export function Navbar() {
             </button>
           </Tooltip>
           <Tooltip label="Notifications">
-            <button
-              aria-label="Notifications"
-              className="rounded-full p-2 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900"
+            <Link
+              to="/notifications"
+              aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ""}`}
+              className="relative rounded-full p-2 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900"
             >
               <Bell className="h-4 w-4" />
-            </button>
+              {unreadCount > 0 && (
+                <span
+                  aria-hidden="true"
+                  className="absolute right-1 top-1 h-2 w-2 rounded-full bg-red-500"
+                />
+              )}
+            </Link>
           </Tooltip>
           <Tooltip label="Settings">
             <button

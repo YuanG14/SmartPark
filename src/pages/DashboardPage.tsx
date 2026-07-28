@@ -1,119 +1,164 @@
+import { Link } from "react-router-dom";
 import { Card, CardHeader } from "../components/ui/Card";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
-
-// MOCK DATA — this whole page is hardcoded for the Phase 2 layout preview.
-// Real Supabase-backed data replaces this in Phase 5 (user dashboard) and
-// Phase 12 (admin analytics).
-const mockOverview = { available: 24, occupied: 31, reserved: 8, total: 63 };
-const mockCurrentParking = {
-  facility: "SmartPark Demo Lot",
-  space: "A17",
-  plate: "ABC 1234",
-  startedAt: "10:00 AM",
-};
-const mockNearby = [
-  { name: "Downtown Plaza Parking", spacesAvailable: 24, distance: "250m", rate: 30 },
-  { name: "Riverside Parking", spacesAvailable: 12, distance: "500m", rate: 25 },
-];
-
-function peso(amount: number) {
-  return `₱${amount.toLocaleString("en-PH", { minimumFractionDigits: 2 })}`;
-}
+import { Skeleton } from "../components/ui/Skeleton";
+import { EmptyState } from "../components/ui/EmptyState";
+import { ReservationCard } from "../components/reservation/ReservationCard";
+import { useAuth } from "../features/auth/AuthProvider";
+import { useReservations } from "../hooks/useReservations";
+import { useVehicles } from "../hooks/useVehicles";
+import { useNotifications } from "../hooks/useNotifications";
+import { useParkingOverview } from "../hooks/useParkingOverview";
 
 export default function DashboardPage() {
+  const { profile } = useAuth();
+  const { upcoming, loading: reservationsLoading } = useReservations();
+  const { vehicles, loading: vehiclesLoading } = useVehicles();
+  const { notifications, unreadCount, loading: notificationsLoading } = useNotifications();
+  const { overview, lots, loading: overviewLoading } = useParkingOverview();
+
+  const nextReservation = upcoming[0];
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold text-neutral-900">Welcome back 👋</h1>
-          <p className="text-sm text-neutral-500">
-            This preview uses mock data — real reservations arrive in Phase 5.
-          </p>
-        </div>
-        <Button>Find Parking</Button>
+        <h1 className="text-xl font-semibold text-neutral-900">
+          Welcome back, {profile?.full_name.split(" ")[0]} 👋
+        </h1>
+        <Link to="/parking">
+          <Button>Find Parking</Button>
+        </Link>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
           <CardHeader title="Parking Overview" />
-          <div className="mb-4 h-2 w-full overflow-hidden rounded-full bg-neutral-100">
-            <div
-              className="h-full bg-brand-500"
-              style={{
-                width: `${((mockOverview.occupied + mockOverview.reserved) / mockOverview.total) * 100}%`,
-              }}
-            />
-          </div>
-          <dl className="grid grid-cols-3 gap-4 text-sm">
-            <div>
-              <dt className="text-neutral-500">Available</dt>
-              <dd className="text-lg font-semibold text-neutral-900">{mockOverview.available}</dd>
-            </div>
-            <div>
-              <dt className="text-neutral-500">Occupied</dt>
-              <dd className="text-lg font-semibold text-neutral-900">{mockOverview.occupied}</dd>
-            </div>
-            <div>
-              <dt className="text-neutral-500">Reserved</dt>
-              <dd className="text-lg font-semibold text-neutral-900">{mockOverview.reserved}</dd>
-            </div>
-          </dl>
+          {overviewLoading ? (
+            <Skeleton className="h-16 w-full" />
+          ) : overview.total === 0 ? (
+            <p className="text-sm text-neutral-500">No parking facilities configured yet.</p>
+          ) : (
+            <>
+              <div className="mb-4 h-2 w-full overflow-hidden rounded-full bg-neutral-100">
+                <div
+                  className="h-full bg-brand-500"
+                  style={{
+                    width: `${((overview.occupied + overview.reserved) / overview.total) * 100}%`,
+                  }}
+                />
+              </div>
+              <dl className="grid grid-cols-3 gap-4 text-sm">
+                <div>
+                  <dt className="text-neutral-500">Available</dt>
+                  <dd className="text-lg font-semibold text-neutral-900">{overview.available}</dd>
+                </div>
+                <div>
+                  <dt className="text-neutral-500">Occupied</dt>
+                  <dd className="text-lg font-semibold text-neutral-900">{overview.occupied}</dd>
+                </div>
+                <div>
+                  <dt className="text-neutral-500">Reserved</dt>
+                  <dd className="text-lg font-semibold text-neutral-900">{overview.reserved}</dd>
+                </div>
+              </dl>
+            </>
+          )}
         </Card>
 
         <Card>
           <CardHeader
-            title="Current Parking"
-            action={<Badge tone="danger">🔴 Occupied</Badge>}
+            title="Upcoming Reservation"
+            action={
+              nextReservation && (
+                <Badge tone="success">🟢 {nextReservation.status}</Badge>
+              )
+            }
           />
-          <dl className="grid grid-cols-2 gap-3 text-sm">
-            <div>
-              <dt className="text-neutral-500">Facility</dt>
-              <dd className="font-medium text-neutral-900">{mockCurrentParking.facility}</dd>
-            </div>
-            <div>
-              <dt className="text-neutral-500">Space</dt>
-              <dd className="font-medium text-neutral-900">{mockCurrentParking.space}</dd>
-            </div>
-            <div>
-              <dt className="text-neutral-500">Vehicle</dt>
-              <dd className="font-medium text-neutral-900">{mockCurrentParking.plate}</dd>
-            </div>
-            <div>
-              <dt className="text-neutral-500">Started</dt>
-              <dd className="font-medium text-neutral-900">{mockCurrentParking.startedAt}</dd>
-            </div>
-          </dl>
-          <div className="mt-4 flex gap-2">
-            <Button size="sm" variant="secondary">
-              View reservation
-            </Button>
-            <Button size="sm" variant="ghost">
-              Extend parking
-            </Button>
-          </div>
+          {reservationsLoading ? (
+            <Skeleton className="h-16 w-full" />
+          ) : nextReservation ? (
+            <ReservationCard reservation={nextReservation} />
+          ) : (
+            <EmptyState
+              title="Nothing booked yet"
+              description="Booking arrives in Phase 8 — for now this reflects real (empty) reservation data."
+              action={
+                <Link to="/reservations">
+                  <Button size="sm" variant="secondary">
+                    View reservations
+                  </Button>
+                </Link>
+              }
+            />
+          )}
+        </Card>
+
+        <Card>
+          <CardHeader
+            title="Vehicles"
+            action={
+              <Link to="/vehicles" className="text-sm font-medium text-brand-700 underline">
+                Manage
+              </Link>
+            }
+          />
+          {vehiclesLoading ? (
+            <Skeleton className="h-8 w-24" />
+          ) : (
+            <p className="text-2xl font-semibold text-neutral-900">{vehicles.length}</p>
+          )}
+          <p className="text-sm text-neutral-500">registered vehicle{vehicles.length === 1 ? "" : "s"}</p>
+        </Card>
+
+        <Card>
+          <CardHeader
+            title="Notifications"
+            action={
+              <Link to="/notifications" className="text-sm font-medium text-brand-700 underline">
+                View all
+              </Link>
+            }
+          />
+          {notificationsLoading ? (
+            <Skeleton className="h-8 w-24" />
+          ) : notifications.length === 0 ? (
+            <p className="text-sm text-neutral-500">You're all caught up.</p>
+          ) : (
+            <p className="text-sm text-neutral-700">
+              {unreadCount > 0 ? `${unreadCount} unread` : "No unread notifications"}
+            </p>
+          )}
         </Card>
 
         <Card className="md:col-span-2">
           <CardHeader title="Nearby Parking" />
-          <div className="grid gap-4 sm:grid-cols-2">
-            {mockNearby.map((lot) => (
-              <div
-                key={lot.name}
-                className="flex items-center justify-between rounded-xl border border-neutral-200 p-4"
-              >
-                <div>
-                  <p className="font-medium text-neutral-900">{lot.name}</p>
-                  <p className="text-sm text-neutral-500">
-                    {lot.spacesAvailable} spaces available · {lot.distance} · {peso(lot.rate)}/hr
-                  </p>
+          {overviewLoading ? (
+            <Skeleton className="h-16 w-full" />
+          ) : lots.length === 0 ? (
+            <p className="text-sm text-neutral-500">No parking facilities configured yet.</p>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2">
+              {lots.map((lot) => (
+                <div
+                  key={lot.id}
+                  className="flex items-center justify-between rounded-xl border border-neutral-200 p-4"
+                >
+                  <div>
+                    <p className="font-medium text-neutral-900">{lot.name}</p>
+                    <p className="text-sm text-neutral-500">
+                      {lot.available_count} of {lot.total_count} spaces available
+                    </p>
+                  </div>
+                  <Link to="/parking">
+                    <Button size="sm" variant="secondary">
+                      View
+                    </Button>
+                  </Link>
                 </div>
-                <Button size="sm" variant="secondary">
-                  View
-                </Button>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </Card>
       </div>
     </div>
