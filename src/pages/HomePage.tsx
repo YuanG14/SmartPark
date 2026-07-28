@@ -11,13 +11,16 @@ export default function HomePage() {
         Intelligent Parking Reservation &amp; Management System.
       </p>
       <div className="mt-8 flex gap-3">
-        <Link to="/dashboard">
-          <Button>View dashboard preview</Button>
+        <Link to="/register">
+          <Button>Get started</Button>
         </Link>
-        <Link to="/styleguide">
-          <Button variant="secondary">View design system</Button>
+        <Link to="/login">
+          <Button variant="secondary">Log in</Button>
         </Link>
       </div>
+      <Link to="/styleguide" className="mt-4 text-sm text-neutral-400 underline">
+        View design system
+      </Link>
     </div>
   );
 }

@@ -1,7 +1,8 @@
-import { NavLink } from "react-router-dom";
-import { Bell, Search, Settings } from "lucide-react";
+import { Link, NavLink, useNavigate } from "react-router-dom";
+import { Bell, LogOut, Search, Settings } from "lucide-react";
 import { Avatar } from "../ui/Avatar";
 import { Tooltip } from "../ui/Tooltip";
+import { useAuth } from "../../features/auth/AuthProvider";
 
 const links = [
   { to: "/dashboard", label: "Dashboard" },
@@ -10,16 +11,23 @@ const links = [
   { to: "/vehicles", label: "Vehicles" },
 ];
 
-// Mock signed-in user for Phase 2 — replaced by real auth state in Phase 4.
-const mockUser = { name: "Danny Hong", role: "Parking user" };
+const roleLabel = { user: "Parking user", staff: "Parking staff", admin: "Admin" };
 
 export function Navbar() {
+  const { profile, signOut } = useAuth();
+  const navigate = useNavigate();
+
+  async function handleSignOut() {
+    await signOut();
+    navigate("/login", { replace: true });
+  }
+
   return (
     <header className="border-b border-neutral-200 bg-white">
       <div className="mx-auto flex max-w-6xl items-center gap-6 px-6 py-3">
-        <span className="text-lg font-semibold tracking-tight text-neutral-900">
+        <Link to="/dashboard" className="text-lg font-semibold tracking-tight text-neutral-900">
           SmartPark
-        </span>
+        </Link>
 
         <nav aria-label="Main" className="flex gap-1 rounded-full bg-neutral-100 p-1">
           {links.map((link) => (
@@ -64,15 +72,30 @@ export function Navbar() {
               <Settings className="h-4 w-4" />
             </button>
           </Tooltip>
-          <div className="ml-2 flex items-center gap-2">
-            <Avatar name={mockUser.name} size="sm" />
-            <div className="hidden text-left sm:block">
-              <p className="text-sm font-medium leading-tight text-neutral-900">
-                {mockUser.name}
-              </p>
-              <p className="text-xs leading-tight text-neutral-500">{mockUser.role}</p>
-            </div>
-          </div>
+
+          {profile && (
+            <Link to="/profile" className="ml-2 flex items-center gap-2">
+              <Avatar name={profile.full_name} size="sm" />
+              <div className="hidden text-left sm:block">
+                <p className="text-sm font-medium leading-tight text-neutral-900">
+                  {profile.full_name}
+                </p>
+                <p className="text-xs leading-tight text-neutral-500">
+                  {roleLabel[profile.role]}
+                </p>
+              </div>
+            </Link>
+          )}
+
+          <Tooltip label="Log out">
+            <button
+              aria-label="Log out"
+              onClick={handleSignOut}
+              className="rounded-full p-2 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
+          </Tooltip>
         </div>
       </div>
     </header>
