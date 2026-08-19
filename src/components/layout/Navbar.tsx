@@ -1,5 +1,15 @@
 import { Link, NavLink, useNavigate } from "react-router-dom";
-import { Bell, Car, LayoutDashboard, LogOut, MapPin, Search, Settings, CalendarDays, ShieldCheck } from "lucide-react";
+import {
+  Bell,
+  Car,
+  LayoutDashboard,
+  LogOut,
+  MapPin,
+  Search,
+  Settings,
+  CalendarDays,
+  ShieldCheck,
+} from "lucide-react";
 import { Avatar } from "../ui/Avatar";
 import { Tooltip } from "../ui/Tooltip";
 import { useAuth } from "../../features/auth/AuthProvider";
@@ -13,6 +23,9 @@ const baseLinks = [
 ];
 
 const roleLabel = { user: "Parking user", staff: "Parking staff", admin: "Admin" };
+
+const actionButtonClass =
+  "relative inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-transparent text-neutral-500 transition-all duration-200 hover:border-neutral-200 hover:bg-white hover:text-neutral-950 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2";
 
 export function Navbar() {
   const { profile, signOut } = useAuth();
@@ -28,10 +41,15 @@ export function Navbar() {
   }
 
   return (
-    <header className="sticky top-0 z-40 border-b border-neutral-200/80 bg-white/90 backdrop-blur-xl">
+    <header className="sticky top-0 z-40 border-b border-neutral-200/80 bg-white/95 shadow-[0_1px_0_rgba(0,0,0,0.02)] backdrop-blur-xl">
       <div className="mx-auto flex max-w-[1500px] items-center gap-4 px-4 py-3 sm:px-6 lg:px-8">
-        <Link to="/dashboard" className="flex shrink-0 items-center gap-2.5 text-lg font-semibold tracking-tight text-neutral-950">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-500 text-sm font-black text-white shadow-sm shadow-brand-200">P</span>
+        <Link
+          to="/dashboard"
+          className="flex shrink-0 items-center gap-2.5 text-lg font-semibold tracking-tight text-neutral-950"
+        >
+          <span className="flex h-10 w-10 items-center justify-center rounded-[14px] bg-brand-500 text-sm font-black text-white shadow-sm shadow-brand-200/70">
+            P
+          </span>
           <span className="hidden sm:block">SmartPark</span>
         </Link>
 
@@ -57,45 +75,67 @@ export function Navbar() {
           })}
         </nav>
 
-        <div className="ml-auto flex items-center gap-1.5">
-          <Tooltip label="Search">
-            <button aria-label="Search" className="rounded-full p-2.5 text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-950">
-              <Search className="h-4 w-4" />
-            </button>
-          </Tooltip>
-          <Tooltip label="Notifications">
-            <Link
-              to="/notifications"
-              aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ""}`}
-              className="relative rounded-full p-2.5 text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-950"
-            >
-              <Bell className="h-4 w-4" />
-              {unreadCount > 0 && (
-                <span aria-hidden="true" className="absolute right-1.5 top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-bold text-white">
-                  {unreadCount > 9 ? "9+" : unreadCount}
-                </span>
-              )}
-            </Link>
-          </Tooltip>
-          <Tooltip label="Settings">
-            <button aria-label="Settings" className="hidden rounded-full p-2.5 text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-950 sm:inline-flex">
-              <Settings className="h-4 w-4" />
-            </button>
-          </Tooltip>
+        <div className="ml-auto flex items-center gap-2">
+          <div className="flex items-center gap-1 rounded-2xl border border-neutral-200/80 bg-neutral-50/90 p-1 shadow-sm shadow-neutral-200/30">
+            <Tooltip label="Find parking">
+              <Link to="/parking" aria-label="Find parking" className={actionButtonClass}>
+                <Search className="h-[18px] w-[18px]" strokeWidth={1.9} />
+              </Link>
+            </Tooltip>
+
+            <Tooltip label={unreadCount > 0 ? `${unreadCount} unread notification${unreadCount === 1 ? "" : "s"}` : "Notifications"}>
+              <Link
+                to="/notifications"
+                aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ""}`}
+                className={actionButtonClass}
+              >
+                <Bell className="h-[18px] w-[18px]" strokeWidth={1.9} />
+                {unreadCount > 0 && (
+                  <span
+                    aria-hidden="true"
+                    className="absolute -right-1 -top-1 flex h-[19px] min-w-[19px] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-extrabold leading-none text-white ring-[3px] ring-white shadow-sm"
+                  >
+                    {unreadCount > 9 ? "9+" : unreadCount}
+                  </span>
+                )}
+              </Link>
+            </Tooltip>
+
+            <Tooltip label="Settings">
+              <Link
+                to="/profile"
+                aria-label="Settings"
+                className={`${actionButtonClass} hidden sm:inline-flex`}
+              >
+                <Settings className="h-[18px] w-[18px]" strokeWidth={1.9} />
+              </Link>
+            </Tooltip>
+          </div>
 
           {profile && (
-            <Link to="/profile" className="ml-1 flex items-center gap-2 rounded-full border border-transparent px-1.5 py-1 transition hover:border-neutral-200 hover:bg-neutral-50 sm:ml-2">
+            <Link
+              to="/profile"
+              className="group ml-0.5 flex items-center gap-2.5 rounded-2xl border border-transparent px-2 py-1.5 transition-all hover:border-neutral-200 hover:bg-neutral-50 sm:ml-1"
+            >
               <Avatar name={profile.full_name} size="sm" />
               <div className="hidden min-w-0 text-left lg:block">
-                <p className="max-w-32 truncate text-sm font-semibold leading-tight text-neutral-950">{profile.full_name}</p>
-                <p className="text-xs leading-tight text-neutral-500">{roleLabel[profile.role]}</p>
+                <p className="max-w-32 truncate text-sm font-semibold leading-tight text-neutral-950 group-hover:text-brand-700">
+                  {profile.full_name}
+                </p>
+                <p className="mt-0.5 text-[11px] font-medium leading-tight text-neutral-500">
+                  {roleLabel[profile.role]}
+                </p>
               </div>
             </Link>
           )}
 
           <Tooltip label="Log out">
-            <button aria-label="Log out" onClick={handleSignOut} className="rounded-full p-2.5 text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-950">
-              <LogOut className="h-4 w-4" />
+            <button
+              aria-label="Log out"
+              onClick={handleSignOut}
+              className={`${actionButtonClass} hover:border-rose-100 hover:bg-rose-50 hover:text-rose-600`}
+            >
+              <LogOut className="h-[18px] w-[18px]" strokeWidth={1.9} />
             </button>
           </Tooltip>
         </div>
@@ -109,8 +149,8 @@ export function Navbar() {
               key={link.to}
               to={link.to}
               className={({ isActive }) =>
-                `inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold ${
-                  isActive ? "bg-neutral-950 text-white" : "text-neutral-600"
+                `inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                  isActive ? "bg-neutral-950 text-white" : "text-neutral-600 hover:bg-neutral-100"
                 }`
               }
             >

@@ -10,10 +10,10 @@ update public.profiles p
 set role = 'admin', updated_at = now()
 from auth.users u
 where p.id = u.id
-  and lower(u.email) = lower('chavezyuan14@gmail.com');
+  and lower(u.email) = lower('YOUR_ADMIN_EMAIL@example.com');
 
 -- Verify the result:
 select u.email, p.full_name, p.role
 from public.profiles p
 join auth.users u on u.id = p.id
-where lower(u.email) = lower('chavezyuan14@gmail.com');
+where lower(u.email) = lower('YOUR_ADMIN_EMAIL@example.com');
