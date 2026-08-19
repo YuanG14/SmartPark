@@ -9,23 +9,49 @@ interface DialogProps {
 }
 
 /**
- * Minimal accessible dialog: traps Escape-to-close, labels itself via
- * aria-labelledby, and returns focus to the trigger on close is left to the
- * caller (store a ref to the trigger element before opening).
+ * Accessible modal dialog.
+ *
+ * Important: focus is initialized only when the dialog opens. We keep the
+ * latest onClose callback in a ref so parent re-renders (for example while
+ * typing into a controlled input) do not re-run the focus effect and steal
+ * focus from the active field.
  */
 export function Dialog({ open, onClose, title, children }: DialogProps) {
   const titleId = useRef(`dialog-title-${Math.random().toString(36).slice(2)}`).current;
   const panelRef = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
+  const previouslyFocusedRef = useRef<HTMLElement | null>(null);
+
+  // Always keep the latest callback without making the open/close effect
+  // depend on a new inline function from the parent on every render.
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     if (!open) return;
+
+    previouslyFocusedRef.current = document.activeElement as HTMLElement | null;
+
     function handleKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") onCloseRef.current();
     }
+
     document.addEventListener("keydown", handleKey);
-    panelRef.current?.focus();
-    return () => document.removeEventListener("keydown", handleKey);
-  }, [open, onClose]);
+
+    // Focus once when the modal opens. Prefer the first usable form control;
+    // fall back to the dialog panel if there is nothing interactive.
+    const frame = window.requestAnimationFrame(() => {
+      const firstFocusable = panelRef.current?.querySelector<HTMLElement>(
+        'input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
+      );
+      (firstFocusable ?? panelRef.current)?.focus();
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      document.removeEventListener("keydown", handleKey);
+      previouslyFocusedRef.current?.focus?.();
+    };
+  }, [open]);
 
   if (!open) return null;
 
