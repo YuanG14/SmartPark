@@ -28,7 +28,7 @@ export function Navbar() {
     <header className="sticky top-0 z-40 border-b border-neutral-200/80 bg-white/90 backdrop-blur-xl">
       <div className="mx-auto flex max-w-[1500px] items-center gap-4 px-4 py-3 sm:px-6 lg:px-8">
         <Link to="/dashboard" className="flex shrink-0 items-center gap-2.5 text-lg font-semibold tracking-tight text-neutral-950">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-500 text-sm font-black text-neutral-950 shadow-sm shadow-brand-200">P</span>
+          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-500 text-sm font-black text-white shadow-sm shadow-brand-200">P</span>
           <span className="hidden sm:block">SmartPark</span>
         </Link>
 

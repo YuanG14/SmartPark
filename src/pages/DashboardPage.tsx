@@ -254,7 +254,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <div className="rounded-[28px] bg-brand-500 p-6 text-neutral-950 shadow-lg shadow-brand-200/60">
+          <div className="rounded-[28px] bg-brand-600 p-6 text-white shadow-lg shadow-brand-200/60">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.16em] text-neutral-700/70">Quick actions</p>
