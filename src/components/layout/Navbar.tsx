@@ -1,11 +1,11 @@
 import { Link, NavLink, useNavigate } from "react-router-dom";
-import { Bell, Car, LayoutDashboard, LogOut, MapPin, Search, Settings, CalendarDays } from "lucide-react";
+import { Bell, Car, LayoutDashboard, LogOut, MapPin, Search, Settings, CalendarDays, ShieldCheck } from "lucide-react";
 import { Avatar } from "../ui/Avatar";
 import { Tooltip } from "../ui/Tooltip";
 import { useAuth } from "../../features/auth/AuthProvider";
 import { useNotifications } from "../../hooks/useNotifications";
 
-const links = [
+const baseLinks = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/parking", label: "Parking", icon: MapPin },
   { to: "/reservations", label: "Reservations", icon: CalendarDays },
@@ -18,6 +18,9 @@ export function Navbar() {
   const { profile, signOut } = useAuth();
   const { unreadCount } = useNotifications();
   const navigate = useNavigate();
+  const links = profile?.role === "admin"
+    ? [...baseLinks, { to: "/admin", label: "Admin", icon: ShieldCheck }]
+    : baseLinks;
 
   async function handleSignOut() {
     await signOut();

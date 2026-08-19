@@ -37,3 +37,15 @@ the Phase 0 architecture document.
 This is a placeholder shell (home/login/dashboard stub pages, basic nav) to
 confirm the toolchain works end-to-end. No real UI, auth, or data yet —
 those come in Phases 2–5.
+
+## Admin setup (reservation approval + payments)
+
+The admin UI is available at `/admin` and is protected both by the client-side role guard and Supabase Row Level Security / RPC role checks.
+
+1. Apply all migrations, including `supabase/migrations/0003_admin_reservations_payments.sql`.
+2. Register the account you want to use as the administrator through SmartPark normally.
+3. Open `supabase/admin_setup.sql`, replace `YOUR_ADMIN_EMAIL@example.com`, and run it once in the Supabase SQL Editor.
+4. Sign out and sign back in (or refresh the profile) so the new `admin` role is loaded.
+5. Open **Admin** from the navbar.
+
+The Payments tab is an internal payment ledger for now. "Mark paid" and "Refund" update the database record and audit log; they do not charge/refund real money until a payment gateway such as GCash/PayMongo/Stripe is integrated.

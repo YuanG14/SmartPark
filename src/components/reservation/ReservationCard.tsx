@@ -16,6 +16,7 @@ const statusTone: Record<ReservationStatus, { tone: "success" | "warning" | "dan
   completed: { tone: "neutral", label: "Completed" },
   cancelled: { tone: "neutral", label: "Cancelled" },
   expired: { tone: "danger", label: "Expired" },
+  rejected: { tone: "danger", label: "Rejected" },
 };
 
 function formatDate(start: string) {

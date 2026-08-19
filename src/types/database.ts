@@ -6,7 +6,8 @@
 export type UserRole = "user" | "staff" | "admin";
 export type VehicleType = "car" | "motorcycle" | "van" | "truck";
 export type ParkingSpaceStatus = "available" | "reserved" | "occupied" | "maintenance" | "blocked";
-export type ReservationStatus = "pending" | "confirmed" | "cancelled" | "completed" | "expired";
+export type ReservationStatus = "pending" | "confirmed" | "cancelled" | "completed" | "expired" | "rejected";
+export type PaymentStatus = "pending" | "paid" | "failed" | "refunded";
 
 export interface Profile {
   id: string;
@@ -115,4 +116,18 @@ export interface AuditLog {
   resource_id: string | null;
   metadata: Record<string, unknown> | null;
   created_at: string;
+}
+
+
+export interface Payment {
+  id: string;
+  reservation_id: string;
+  profile_id: string;
+  amount: number;
+  status: PaymentStatus;
+  method: string | null;
+  reference: string | null;
+  paid_at: string | null;
+  created_at: string;
+  updated_at: string;
 }
