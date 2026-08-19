@@ -7,7 +7,7 @@ const NOTIFICATIONS_CHANGED_EVENT = "smartpark:notifications-changed";
 
 function broadcastNotificationsChanged() {
   if (typeof window !== "undefined") {
-    window.dispatchEvent(new CustomEvent(NOTIFICATIONS_CHANGED_EVENT));
+    window.dispatchEvent(new Event(NOTIFICATIONS_CHANGED_EVENT));
   }
 }
 
@@ -16,14 +16,12 @@ export function useNotifications() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const refresh = useCallback(async (showLoading = false) => {
+  const refresh = useCallback(async () => {
     if (!user) {
       setNotifications([]);
       setLoading(false);
       return;
     }
-
-    if (showLoading) setLoading(true);
 
     const { data, error } = await supabase
       .from("notifications")
@@ -32,57 +30,38 @@ export function useNotifications() {
       .order("created_at", { ascending: false })
       .limit(20);
 
-    if (!error) setNotifications((data ?? []) as Notification[]);
+    if (!error) {
+      setNotifications((data ?? []) as Notification[]);
+    }
+
     setLoading(false);
   }, [user]);
 
   useEffect(() => {
-    void refresh(true);
+    setLoading(true);
+    void refresh();
   }, [refresh]);
 
-  // Keep every useNotifications() instance in the current tab in sync.
-  // This matters because Navbar and NotificationsPage use the hook separately.
+  // Navbar, Dashboard, and NotificationsPage each use this hook separately.
+  // This lightweight browser event keeps those instances synchronized after
+  // a notification is marked as read without introducing a realtime channel
+  // that can fail during app startup.
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    const handleChanged = () => {
-      void refresh(false);
+    const handleNotificationsChanged = () => {
+      void refresh();
     };
 
-    window.addEventListener(NOTIFICATIONS_CHANGED_EVENT, handleChanged);
-    return () => window.removeEventListener(NOTIFICATIONS_CHANGED_EVENT, handleChanged);
-  }, [refresh]);
-
-  // Also listen for database changes so notification counts remain correct
-  // across multiple tabs/devices and when an admin action creates a notification.
-  useEffect(() => {
-    if (!user) return;
-
-    const channel = supabase
-      .channel(`notifications:${user.id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "notifications",
-          filter: `profile_id=eq.${user.id}`,
-        },
-        () => {
-          void refresh(false);
-        },
-      )
-      .subscribe();
-
+    window.addEventListener(NOTIFICATIONS_CHANGED_EVENT, handleNotificationsChanged);
     return () => {
-      void supabase.removeChannel(channel);
+      window.removeEventListener(NOTIFICATIONS_CHANGED_EVENT, handleNotificationsChanged);
     };
-  }, [user, refresh]);
+  }, [refresh]);
 
   async function markAsRead(id: string) {
     if (!user) return;
 
-    // Update this component immediately.
     setNotifications((prev) =>
       prev.map((notification) =>
         notification.id === id ? { ...notification, is_read: true } : notification,
@@ -96,19 +75,19 @@ export function useNotifications() {
       .eq("profile_id", user.id);
 
     if (error) {
-      // Roll back to the database state when the write fails.
-      await refresh(false);
+      await refresh();
       return;
     }
 
-    // Tell Navbar/Dashboard hook instances to refresh their unread count now.
     broadcastNotificationsChanged();
   }
 
   async function markAllAsRead() {
     if (!user) return;
 
-    setNotifications((prev) => prev.map((notification) => ({ ...notification, is_read: true })));
+    setNotifications((prev) =>
+      prev.map((notification) => ({ ...notification, is_read: true })),
+    );
 
     const { error } = await supabase
       .from("notifications")
@@ -117,7 +96,7 @@ export function useNotifications() {
       .eq("is_read", false);
 
     if (error) {
-      await refresh(false);
+      await refresh();
       return;
     }
 
