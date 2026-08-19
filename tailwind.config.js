@@ -4,15 +4,15 @@ export default {
   theme: {
     extend: {
       colors: {
-        // SmartPark brand: white / green accent on light neutrals.
-        // Full palette gets refined in Phase 2 (design system).
         brand: {
-          50: "#f0fdf6",
-          100: "#dcfce9",
-          400: "#4ade80",
-          500: "#22c55e",
-          600: "#16a34a",
-          700: "#15803d",
+          50: "#fffbeb",
+          100: "#fef3c7",
+          200: "#fde68a",
+          400: "#fbbf24",
+          500: "#f5b82e",
+          600: "#d99a0b",
+          700: "#a86f05",
+          800: "#7c520b",
         },
       },
       borderRadius: {
