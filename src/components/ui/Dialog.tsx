@@ -6,6 +6,7 @@ interface DialogProps {
   onClose: () => void;
   title: string;
   children: ReactNode;
+  className?: string;
 }
 
 /**
@@ -16,7 +17,7 @@ interface DialogProps {
  * typing into a controlled input) do not re-run the focus effect and steal
  * focus from the active field.
  */
-export function Dialog({ open, onClose, title, children }: DialogProps) {
+export function Dialog({ open, onClose, title, children, className = "" }: DialogProps) {
   const titleId = useRef(`dialog-title-${Math.random().toString(36).slice(2)}`).current;
   const panelRef = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
@@ -68,7 +69,7 @@ export function Dialog({ open, onClose, title, children }: DialogProps) {
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-xl focus:outline-none"
+        className={`relative w-full max-w-md rounded-2xl bg-white p-6 shadow-xl focus:outline-none ${className}`}
       >
         <h2 id={titleId} className="text-base font-semibold text-neutral-900">
           {title}

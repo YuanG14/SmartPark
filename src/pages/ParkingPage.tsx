@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import {
   ArrowRight,
+  CalendarDays,
   Bike,
   Building2,
   Car,
@@ -9,7 +10,9 @@ import {
   ChevronDown,
   CircleParking,
   Clock3,
+  CreditCard,
   MapPin,
+  ReceiptText,
   Search,
   ShieldCheck,
   SlidersHorizontal,
@@ -18,8 +21,13 @@ import {
   Wrench,
 } from "lucide-react";
 import { Button } from "../components/ui/Button";
+import { Dialog } from "../components/ui/Dialog";
+import { Input } from "../components/ui/Input";
+import { Select } from "../components/ui/Select";
 import { Skeleton } from "../components/ui/Skeleton";
 import { useParkingOverview } from "../hooks/useParkingOverview";
+import { useReservations } from "../hooks/useReservations";
+import { useVehicles } from "../hooks/useVehicles";
 import { supabase } from "../lib/supabase";
 import type { ParkingRateRule, ParkingSpace, ParkingSpaceStatus, VehicleType } from "../types/database";
 
@@ -69,6 +77,47 @@ const vehicleIcon: Record<VehicleType, typeof Car> = {
   truck: Truck,
 };
 
+function toLocalDateInput(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function toLocalTimeInput(date: Date) {
+  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+}
+
+function initialBookingTimes() {
+  const start = new Date();
+  start.setSeconds(0, 0);
+  const remainder = start.getMinutes() % 15;
+  start.setMinutes(start.getMinutes() + (remainder === 0 ? 15 : 15 - remainder));
+  const end = new Date(start.getTime() + 2 * 60 * 60 * 1000);
+  return {
+    date: toLocalDateInput(start),
+    start: toLocalTimeInput(start),
+    end: toLocalTimeInput(end),
+  };
+}
+
+function calculateParkingCost(rate: ParkingRateRule | undefined, start: Date, end: Date) {
+  if (!rate || end <= start) return null;
+  const totalMinutes = Math.ceil((end.getTime() - start.getTime()) / 60000);
+  const fullDays = Math.floor(totalMinutes / 1440);
+  const remainingMinutes = totalMinutes % 1440;
+  let total = fullDays * Number(rate.daily_maximum);
+
+  if (remainingMinutes > 0) {
+    const billedHours = Math.ceil(remainingMinutes / 60);
+    const partialDay =
+      Number(rate.base_rate) + Math.max(0, billedHours - 1) * Number(rate.additional_hour_rate);
+    total += Math.min(partialDay, Number(rate.daily_maximum));
+  }
+
+  return Math.round(total * 100) / 100;
+}
+
 function formatPeso(value: number | null | undefined) {
   if (value == null) return "Rate unavailable";
   return new Intl.NumberFormat("en-PH", {
@@ -79,7 +128,10 @@ function formatPeso(value: number | null | undefined) {
 }
 
 export default function ParkingPage() {
+  const navigate = useNavigate();
   const { overview, lots, loading: lotsLoading, error, refresh } = useParkingOverview();
+  const { vehicles } = useVehicles();
+  const { createReservation } = useReservations();
   const [query, setQuery] = useState("");
   const [selectedLotId, setSelectedLotId] = useState<string | null>(null);
   const [spaces, setSpaces] = useState<ParkingSpace[]>([]);
@@ -88,6 +140,13 @@ export default function ParkingPage() {
   const [statusFilter, setStatusFilter] = useState<FilterStatus>("all");
   const [vehicleFilter, setVehicleFilter] = useState<VehicleFilter>("all");
   const [selectedSpaceId, setSelectedSpaceId] = useState<string | null>(null);
+  const [bookingOpen, setBookingOpen] = useState(false);
+  const [bookingVehicleId, setBookingVehicleId] = useState("");
+  const [bookingDate, setBookingDate] = useState("");
+  const [bookingStart, setBookingStart] = useState("");
+  const [bookingEnd, setBookingEnd] = useState("");
+  const [bookingError, setBookingError] = useState<string | null>(null);
+  const [bookingSubmitting, setBookingSubmitting] = useState(false);
 
   const filteredLots = useMemo(() => {
     const term = query.trim().toLowerCase();
@@ -161,6 +220,75 @@ export default function ParkingPage() {
   const selectedRate = selectedSpace
     ? rates.find((rate) => rate.vehicle_type === selectedSpace.vehicle_type_supported)
     : rates.find((rate) => rate.vehicle_type === "car") ?? rates[0];
+  const compatibleVehicles = selectedSpace
+    ? vehicles.filter((vehicle) => vehicle.vehicle_type === selectedSpace.vehicle_type_supported)
+    : [];
+
+  const bookingStartDate = bookingDate && bookingStart ? new Date(`${bookingDate}T${bookingStart}`) : null;
+  const bookingEndDate = bookingDate && bookingEnd ? new Date(`${bookingDate}T${bookingEnd}`) : null;
+  const estimatedCost =
+    bookingStartDate && bookingEndDate
+      ? calculateParkingCost(selectedRate, bookingStartDate, bookingEndDate)
+      : null;
+
+  function openBooking() {
+    if (!selectedSpace) return;
+    const initial = initialBookingTimes();
+    setBookingDate(initial.date);
+    setBookingStart(initial.start);
+    setBookingEnd(initial.end);
+    const firstCompatible = vehicles.find(
+      (vehicle) => vehicle.vehicle_type === selectedSpace.vehicle_type_supported
+    );
+    setBookingVehicleId(firstCompatible?.id ?? "");
+    setBookingError(null);
+    setBookingOpen(true);
+  }
+
+  async function submitBooking(event: FormEvent) {
+    event.preventDefault();
+    if (!selectedSpace || !selectedLot) return;
+
+    if (!bookingVehicleId) {
+      setBookingError(`Add or select a ${selectedSpace.vehicle_type_supported} before reserving this space.`);
+      return;
+    }
+    if (!bookingStartDate || !bookingEndDate || Number.isNaN(bookingStartDate.getTime()) || Number.isNaN(bookingEndDate.getTime())) {
+      setBookingError("Choose a valid reservation date and time.");
+      return;
+    }
+    if (bookingStartDate <= new Date()) {
+      setBookingError("Your reservation must start in the future.");
+      return;
+    }
+    if (bookingEndDate <= bookingStartDate) {
+      setBookingError("Exit time must be later than arrival time.");
+      return;
+    }
+    if (estimatedCost == null) {
+      setBookingError("A parking rate is not configured for this space yet.");
+      return;
+    }
+
+    setBookingSubmitting(true);
+    setBookingError(null);
+    const result = await createReservation({
+      vehicle_id: bookingVehicleId,
+      parking_space_id: selectedSpace.id,
+      start_time: bookingStartDate.toISOString(),
+      end_time: bookingEndDate.toISOString(),
+      estimated_cost: estimatedCost,
+    });
+    setBookingSubmitting(false);
+
+    if (result.error) {
+      setBookingError(result.error);
+      return;
+    }
+
+    setBookingOpen(false);
+    navigate("/reservations", { state: { reservationCreated: true } });
+  }
 
   const utilization = overview.total
     ? Math.round(((overview.occupied + overview.reserved) / overview.total) * 100)
@@ -445,11 +573,9 @@ export default function ParkingPage() {
                     {selectedRate ? <span className="ml-1 text-sm font-medium text-neutral-400">base</span> : null}
                   </p>
                 </div>
-                <Link to="/reservations">
-                  <Button size="lg" className="w-full rounded-2xl px-6 sm:w-auto">
-                    Continue to reservation <ArrowRight className="h-4 w-4" />
-                  </Button>
-                </Link>
+                <Button size="lg" className="w-full rounded-2xl px-6 sm:w-auto" onClick={openBooking}>
+                  Reserve this space <ArrowRight className="h-4 w-4" />
+                </Button>
               </div>
             ) : null}
           </div>
@@ -470,6 +596,121 @@ export default function ParkingPage() {
           </div>
         </div>
       </section>
+
+      <Dialog
+        open={bookingOpen}
+        onClose={() => !bookingSubmitting && setBookingOpen(false)}
+        title="Reserve your parking space"
+        className="max-w-2xl rounded-[28px] p-0 overflow-hidden"
+      >
+        <form onSubmit={submitBooking}>
+          <div className="border-b border-neutral-100 px-6 pb-5">
+            <div className="rounded-2xl border border-brand-100 bg-brand-50 p-4">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-brand-700">Selected parking</p>
+                  <p className="mt-1 text-lg font-semibold text-neutral-950">
+                    {selectedLot?.name} · {selectedSpace?.space_number}
+                  </p>
+                  <p className="mt-1 flex items-center gap-1.5 text-sm text-neutral-500">
+                    <MapPin className="h-4 w-4" />
+                    {selectedLot?.address || "Parking facility"}
+                  </p>
+                </div>
+                <span className="rounded-xl bg-white px-3 py-2 text-xs font-semibold capitalize text-brand-800 shadow-sm">
+                  {selectedSpace?.vehicle_type_supported}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-5 px-6 py-5">
+            {compatibleVehicles.length === 0 ? (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                <p className="font-semibold text-amber-900">You need a compatible vehicle first.</p>
+                <p className="mt-1 text-sm leading-6 text-amber-800">
+                  This space supports {selectedSpace?.vehicle_type_supported} parking. Add a matching vehicle before completing the reservation.
+                </p>
+                <Link to="/vehicles" onClick={() => setBookingOpen(false)} className="mt-3 inline-flex text-sm font-semibold text-amber-900 underline underline-offset-4">
+                  Add a vehicle
+                </Link>
+              </div>
+            ) : (
+              <Select
+                label="Vehicle"
+                value={bookingVehicleId}
+                onChange={(event) => setBookingVehicleId(event.target.value)}
+                options={compatibleVehicles.map((vehicle) => ({
+                  value: vehicle.id,
+                  label: `${vehicle.plate_number}${vehicle.make || vehicle.model ? ` · ${[vehicle.make, vehicle.model].filter(Boolean).join(" ")}` : ""}`,
+                }))}
+              />
+            )}
+
+            <div className="grid gap-4 sm:grid-cols-3">
+              <Input
+                label="Date"
+                type="date"
+                min={toLocalDateInput(new Date())}
+                value={bookingDate}
+                onChange={(event) => setBookingDate(event.target.value)}
+                required
+              />
+              <Input
+                label="Arrival"
+                type="time"
+                value={bookingStart}
+                onChange={(event) => setBookingStart(event.target.value)}
+                required
+              />
+              <Input
+                label="Exit"
+                type="time"
+                value={bookingEnd}
+                onChange={(event) => setBookingEnd(event.target.value)}
+                required
+              />
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="rounded-2xl bg-neutral-50 p-4">
+                <CalendarDays className="h-5 w-5 text-brand-600" />
+                <p className="mt-3 text-xs font-medium text-neutral-400">Schedule</p>
+                <p className="mt-1 text-sm font-semibold text-neutral-900">{bookingDate || "Choose date"}</p>
+              </div>
+              <div className="rounded-2xl bg-neutral-50 p-4">
+                <CreditCard className="h-5 w-5 text-brand-600" />
+                <p className="mt-3 text-xs font-medium text-neutral-400">Base rate</p>
+                <p className="mt-1 text-sm font-semibold text-neutral-900">{formatPeso(selectedRate?.base_rate)}</p>
+              </div>
+              <div className="rounded-2xl bg-brand-50 p-4">
+                <ReceiptText className="h-5 w-5 text-brand-700" />
+                <p className="mt-3 text-xs font-medium text-brand-700">Estimated total</p>
+                <p className="mt-1 text-xl font-semibold text-brand-900">{estimatedCost == null ? "—" : formatPeso(estimatedCost)}</p>
+              </div>
+            </div>
+
+            {bookingError ? (
+              <div role="alert" className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800">
+                {bookingError}
+              </div>
+            ) : null}
+
+            <p className="text-xs leading-5 text-neutral-400">
+              The database performs the final overlap check when you confirm, so two drivers cannot reserve the same space for conflicting times.
+            </p>
+          </div>
+
+          <div className="flex flex-col-reverse gap-3 border-t border-neutral-100 bg-neutral-50 px-6 py-4 sm:flex-row sm:items-center sm:justify-end">
+            <Button type="button" variant="ghost" onClick={() => setBookingOpen(false)} disabled={bookingSubmitting}>
+              Cancel
+            </Button>
+            <Button type="submit" size="lg" isLoading={bookingSubmitting} disabled={compatibleVehicles.length === 0} className="rounded-2xl px-6">
+              Confirm reservation
+            </Button>
+          </div>
+        </form>
+      </Dialog>
     </div>
   );
 }

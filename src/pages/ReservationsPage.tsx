@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   CalendarCheck2,
   CalendarClock,
@@ -18,6 +18,9 @@ import { Skeleton } from "../components/ui/Skeleton";
 import { ErrorState } from "../components/ui/ErrorState";
 
 export default function ReservationsPage() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const reservationCreated = Boolean((location.state as { reservationCreated?: boolean } | null)?.reservationCreated);
   const { reservations, upcoming, history, loading, error, refresh } = useReservations();
   const [tab, setTab] = useState<"upcoming" | "history">("upcoming");
   const [query, setQuery] = useState("");
@@ -63,6 +66,27 @@ export default function ReservationsPage() {
           </Button>
         </Link>
       </section>
+
+      {reservationCreated ? (
+        <div className="flex flex-col gap-3 rounded-[22px] border border-brand-200 bg-brand-50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-600 text-white">
+              <CheckCircle2 className="h-5 w-5" />
+            </span>
+            <div>
+              <p className="font-semibold text-brand-950">Reservation created</p>
+              <p className="mt-1 text-sm text-brand-800">Your booking is now listed under Upcoming reservations.</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate(location.pathname, { replace: true, state: null })}
+            className="text-sm font-semibold text-brand-800 hover:text-brand-950"
+          >
+            Dismiss
+          </button>
+        </div>
+      ) : null}
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <SummaryCard
