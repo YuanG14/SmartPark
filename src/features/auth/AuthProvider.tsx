@@ -3,105 +3,137 @@ import {
   ReactNode,
   useContext,
   useEffect,
+  useMemo,
   useState,
-  useCallback,
 } from "react";
-import type { Session, User } from "@supabase/supabase-js";
-import { supabase } from "../../lib/supabase";
-import type { Profile } from "../../types/database";
+import type { Profile, UserRole } from "../../types/database";
+
+interface LocalUser {
+  id: string;
+  email: string;
+}
+
+interface LocalSession {
+  user: LocalUser;
+}
 
 interface AuthContextValue {
-  session: Session | null;
-  user: User | null;
+  session: LocalSession | null;
+  user: LocalUser | null;
   profile: Profile | null;
   loading: boolean;
-  signUp: (email: string, password: string, fullName: string) => Promise<{ error: string | null; needsEmailConfirmation: boolean }>;
-  signIn: (email: string, password: string) => Promise<{ error: string | null }>;
+  signInAsDemo: (role: UserRole) => Promise<void>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  updateLocalProfile: (updates: { full_name?: string; phone?: string | null }) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+const STORAGE_KEY = "smartpark.dev-auth";
+
+const demoProfiles: Record<"user" | "admin", { user: LocalUser; profile: Profile }> = {
+  user: {
+    user: {
+      id: "11111111-1111-4111-8111-111111111111",
+      email: "user@smartpark.local",
+    },
+    profile: {
+      id: "11111111-1111-4111-8111-111111111111",
+      role: "user",
+      full_name: "Yuan Chavez",
+      phone: null,
+      created_at: new Date(0).toISOString(),
+      updated_at: new Date(0).toISOString(),
+    },
+  },
+  admin: {
+    user: {
+      id: "22222222-2222-4222-8222-222222222222",
+      email: "admin@smartpark.local",
+    },
+    profile: {
+      id: "22222222-2222-4222-8222-222222222222",
+      role: "admin",
+      full_name: "SmartPark Admin",
+      phone: null,
+      created_at: new Date(0).toISOString(),
+      updated_at: new Date(0).toISOString(),
+    },
+  },
+};
+
+type StoredAuth = {
+  user: LocalUser;
+  profile: Profile;
+};
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [session, setSession] = useState<Session | null>(null);
-  const [profile, setProfile] = useState<Profile | null>(null);
+  const [auth, setAuth] = useState<StoredAuth | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const loadProfile = useCallback(async (userId: string) => {
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", userId)
-      .single();
-    if (!error) setProfile(data as Profile);
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) setAuth(JSON.parse(stored) as StoredAuth);
+    } catch {
+      localStorage.removeItem(STORAGE_KEY);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  useEffect(() => {
-    // On first load, restore whatever session Supabase has persisted
-    // (it stores the refresh token in localStorage under the hood).
-    supabase.auth.getSession().then(async ({ data }) => {
-      setSession(data.session);
-      if (data.session?.user) await loadProfile(data.session.user.id);
-      setLoading(false);
-    });
-
-    // Keep session in sync across tabs, token refreshes, sign-in, sign-out.
-    const { data: listener } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
-      setSession(newSession);
-      if (newSession?.user) {
-        await loadProfile(newSession.user.id);
-      } else {
-        setProfile(null);
-      }
-    });
-
-    return () => listener.subscription.unsubscribe();
-  }, [loadProfile]);
-
-  async function signUp(email: string, password: string, fullName: string) {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      // Read by the `handle_new_user` trigger (Phase 4 migration) to seed
-      // the new profiles row — role is never taken from this payload.
-      options: { data: { full_name: fullName } },
-    });
-    if (error) return { error: error.message, needsEmailConfirmation: false };
-    // If email confirmation is required, Supabase returns a user but no
-    // session yet — the caller needs to tell the person to check their inbox.
-    return { error: null, needsEmailConfirmation: !data.session };
+  function persist(next: StoredAuth | null) {
+    setAuth(next);
+    if (next) localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    else localStorage.removeItem(STORAGE_KEY);
   }
 
-  async function signIn(email: string, password: string) {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    return { error: error ? error.message : null };
+  async function signInAsDemo(role: UserRole) {
+    // Staff authentication will be introduced later. For now, staff falls back
+    // to the normal parking-user demo profile.
+    const preset = role === "admin" ? demoProfiles.admin : demoProfiles.user;
+    persist({
+      user: { ...preset.user },
+      profile: { ...preset.profile },
+    });
   }
 
   async function signOut() {
-    await supabase.auth.signOut();
+    persist(null);
   }
 
   async function refreshProfile() {
-    if (session?.user) await loadProfile(session.user.id);
+    // Local development auth has no remote profile to refresh.
+    return;
   }
 
-  return (
-    <AuthContext.Provider
-      value={{
-        session,
-        user: session?.user ?? null,
-        profile,
-        loading,
-        signUp,
-        signIn,
-        signOut,
-        refreshProfile,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
+  async function updateLocalProfile(updates: { full_name?: string; phone?: string | null }) {
+    if (!auth) return;
+    persist({
+      ...auth,
+      profile: {
+        ...auth.profile,
+        ...updates,
+        updated_at: new Date().toISOString(),
+      },
+    });
+  }
+
+  const value = useMemo<AuthContextValue>(
+    () => ({
+      session: auth ? { user: auth.user } : null,
+      user: auth?.user ?? null,
+      profile: auth?.profile ?? null,
+      loading,
+      signInAsDemo,
+      signOut,
+      refreshProfile,
+      updateLocalProfile,
+    }),
+    [auth, loading],
   );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {

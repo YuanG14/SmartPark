@@ -5,8 +5,7 @@ import type { UserRole } from "../types/database";
 
 interface ProtectedRouteProps {
   children: ReactNode;
-  /** If provided, only these roles may view the route (checked client-side
-   *  for UX only — the real enforcement is always RLS on the database). */
+  /** If provided, only these local demo roles may view the route. */
   allowedRoles?: UserRole[];
 }
 
@@ -15,7 +14,7 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
   const location = useLocation();
 
   if (loading) {
-    // Avoid a flash-redirect to /login while the session is still restoring.
+    // Avoid a flash redirect while the local development session is restoring.
     return <div className="p-8 text-sm text-neutral-400">Loading…</div>;
   }
 

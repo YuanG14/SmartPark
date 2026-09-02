@@ -1,6 +1,5 @@
 import { FormEvent, useState } from "react";
 import { useAuth } from "../features/auth/AuthProvider";
-import { supabase } from "../lib/supabase";
 import { Card, CardHeader } from "../components/ui/Card";
 import { Input } from "../components/ui/Input";
 import { Button } from "../components/ui/Button";
@@ -11,7 +10,7 @@ import { useToast } from "../components/ui/Toast";
 const roleLabel = { user: "Parking user", staff: "Parking staff", admin: "Admin" };
 
 export default function ProfilePage() {
-  const { profile, refreshProfile } = useAuth();
+  const { profile, updateLocalProfile } = useAuth();
   const { showToast } = useToast();
   const [fullName, setFullName] = useState(profile?.full_name ?? "");
   const [phone, setPhone] = useState(profile?.phone ?? "");
@@ -22,20 +21,9 @@ export default function ProfilePage() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setSaving(true);
-    // Note: `role` is never included in this update — the RLS policy from
-    // Phase 3 also rejects any attempt to change it via this path, so this
-    // is defense in depth, not the only line of defense.
-    const { error } = await supabase
-      .from("profiles")
-      .update({ full_name: fullName, phone })
-      .eq("id", profile.id);
+    await updateLocalProfile({ full_name: fullName, phone });
     setSaving(false);
-    if (error) {
-      showToast("Could not save changes", "error");
-      return;
-    }
-    await refreshProfile();
-    showToast("Profile updated", "success");
+    showToast("Profile updated locally", "success");
   }
 
   return (
